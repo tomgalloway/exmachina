@@ -1,0 +1,43 @@
+                                 _     _             
+   _____  ___ __ ___   __ _  ___| |__ (_)_ __   __ _ 
+  / _ \ \/ / '_ ` _ \ / _` |/ __| '_ \| | '_ \ / _` |
+ |  __/>  <| | | | | | (_| | (__| | | | | | | | (_| |
+  \___/_/\_\_| |_| |_|\__,_|\___|_| |_|_|_| |_|\__,_|
+                                                     
+                                 by the hand of root
+
+### Status
+
+Just a first commit...
+
+TODO:
+* export python-augeas API calls in server
+* add /etc/init.d start/stop/status/reset API methods
+* re-implement python-augeas methods using API client-side
+* use /var/lib/exmachina/<something> as socket instead of /tmp/exmachina.sock?
+* check to make sure server is running as root
+* check/set permissions on socket after server opens it
+* tests and demonstrations
+* fix/remove logging
+
+### Dependancies (server)
+
+* augeas configuration editing library
+* python-augeas wrapper for augeas
+* bjsonrpc python library
+
+On debian (wheezy) try:
+
+  $ sudo apt-get install augeas-tools python-bjsonrpc python-augeas
+
+### Dependancies (client)
+
+* bjsonrpc
+
+On debian (wheezy) try:
+
+  $ sudo apt-get install bjsonrpc
+
+### License
+
+exmachina.py is GPLv3
