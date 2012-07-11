@@ -30,11 +30,15 @@ def main():
     print c.call.initd_status("bluetooth")
     print "hostname: %s" % c.call.augeas_get("/files/etc/hostname/*")
     print "localhost: %s" % c.call.augeas_get("/files/etc/hosts/1/canonical")
+    sock.close()
 
     print "========= Testing user client library"
     client = ExMachinaClient()
     print client.augeas.match("/files/etc/*")
     print client.initd.restart("bluetooth")
+    print client.initd.status("bluetooth")
+    print client.initd.status("greentooth")
+    client.close()
 
 if __name__ == '__main__':
     main()

@@ -141,6 +141,9 @@ class ExMachinaClient():
         self.initd.start = self.conn.call.initd_start
         self.initd.stop = self.conn.call.initd_stop
         self.initd.restart = self.conn.call.initd_restart
+    
+    def close(self):
+        self.sock.close()
 
 def run_server(socket_path="/tmp/exmachina.sock"):
     # TODO: check for root permissions, warn if not root
@@ -174,6 +177,10 @@ def main():
         default=False,
         help="Show more debugging statements", 
         action="store_true")
+    parser.add_option("-q", "--quiet", 
+        default=False,
+        help="Show fewer informational statements", 
+        action="store_true")
 
     (options, args) = parser.parse_args()
 
@@ -188,6 +195,8 @@ def main():
 
     if options.verbose:
         log.setLevel(logging.DEBUG)
+    elif options.quiet:
+        log.setLevel(logging.ERROR)
     else:
         log.setLevel(logging.INFO)
 
