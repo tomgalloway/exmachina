@@ -18,8 +18,15 @@ def main():
     sock.connect(socket_path)
 
     c = bjsonrpc.connection.Connection(sock)
-    print c.call.whattime()
-    print c.call.listfiles()
+    print "time: %s" % c.call.test_whattime()
+    print "files: %s" % c.call.test_listfiles()
+    print c.call.initd_status("bluetooth")
+    print "/*: %s" % c.call.augeas_match("/*")
+    print "/files/*: %s" % c.call.augeas_match("/files/*")
+    print "/files/etc/*: %s" % c.call.augeas_match("/files/etc/*")
+    print "/augeas/*: %s" % c.call.augeas_match("/augeas/*")
+    print "hostname: %s" % c.call.augeas_get("/files/etc/hostname/*")
+    print "localhost: %s" % c.call.augeas_get("/files/etc/hosts/1/canonical")
 
 if __name__ == '__main__':
     main()

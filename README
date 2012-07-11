@@ -11,14 +11,11 @@
 Just a first commit...
 
 TODO:
-* export python-augeas API calls in server
-* add /etc/init.d start/stop/status/reset API methods
 * re-implement python-augeas methods using API client-side
 * use /var/lib/exmachina/<something> as socket instead of /tmp/exmachina.sock?
 * check to make sure server is running as root
 * check/set permissions on socket after server opens it
 * tests and demonstrations
-* fix/remove logging
 
 ### Dependancies (server)
 
