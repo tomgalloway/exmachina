@@ -11,13 +11,13 @@ import logging
 import socket
 import subprocess
 import stat
+import time
 
 import bjsonrpc
 import bjsonrpc.handlers
 import bjsonrpc.server
 import augeas
 
-import time # TODO
 
 log = logging.getLogger(__name__)
 
@@ -115,9 +115,32 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
 
     def initd_restart(self, servicename):
         return run_service(servicename, "restart")
-    
+   
+class EmptyClass():
+    pass
+
 class ExMachinaClient():
-    pass #TODO
+
+    def __init__(self, socket_path = "/tmp/exmachina.sock"):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(socket_path)
+        self.conn = bjsonrpc.connection.Connection(self.sock)
+
+        self.augeas = EmptyClass()
+        self.initd = EmptyClass()
+
+        self.augeas.save = self.conn.call.augeas_save
+        self.augeas.set = self.conn.call.augeas_set
+        self.augeas.setm = self.conn.call.augeas_setm
+        self.augeas.get = self.conn.call.augeas_get
+        self.augeas.match = self.conn.call.augeas_match
+        self.augeas.insert = self.conn.call.augeas_insert
+        self.augeas.move = self.conn.call.augeas_move
+        self.augeas.remove = self.conn.call.augeas_remove
+        self.initd.status = self.conn.call.initd_status
+        self.initd.start = self.conn.call.initd_start
+        self.initd.stop = self.conn.call.initd_stop
+        self.initd.restart = self.conn.call.initd_restart
 
 def run_server(socket_path="/tmp/exmachina.sock"):
     # TODO: check for root permissions, warn if not root

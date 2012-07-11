@@ -8,12 +8,10 @@
 
 ### Status
 
-Just a first commit...
+Basic server and client functionality implemented. Very crude.
 
 TODO:
-* re-implement python-augeas methods using API client-side
 * use /var/lib/exmachina/<something> as socket instead of /tmp/exmachina.sock?
-* check/set permissions on socket after server opens it
 * tests and demonstrations
 
 ### Dependancies (server)
