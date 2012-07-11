@@ -122,6 +122,9 @@ class ExMachinaClient():
 def run_server(socket_path="/tmp/exmachina.sock"):
     # TODO: check for root permissions, warn if not root
 
+    if not 0 == os.geteuid():
+        log.warn("Expected to be running as root!")
+
     if os.path.exists(socket_path):
         os.unlink(socket_path)
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
