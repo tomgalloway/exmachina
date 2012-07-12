@@ -32,11 +32,10 @@ def main():
         secret_key = sys.stdin.readline()
         print "sent!"
 
-    print "========= Testing low level connection"
+    print "========= Testing JSON-RPC connection"
     c = bjsonrpc.connection.Connection(sock)
     if secret_key:
         c.call.authenticate(secret_key)
-    print "time: %s" % c.call.test_whattime()
     print "/*: %s" % c.call.augeas_match("/*")
     print "/augeas/*: %s" % c.call.augeas_match("/augeas/*")
     print "/etc/* files:"
@@ -50,7 +49,7 @@ def main():
     print "========= Testing user client library"
     client = ExMachinaClient(secret_key=secret_key)
     print client.augeas.match("/files/etc/*")
-    print client.initd.restart("bluetooth")
+    #print client.initd.restart("bluetooth")
     print client.initd.status("greentooth")
     print "(expect Error on the above line)"
     print client.initd.status("bluetooth")

@@ -1,8 +1,32 @@
 #!/usr/bin/env python
 
-# Author: bnewbold <bnewbold@robocracy.org>
-# Date: July 2012
-# License: GPLv3 (see http://www.gnu.org/licenses/gpl-3.0.html)
+"""
+Author: bnewbold <bnewbold@robocracy.org>
+Date: July 2012
+License: GPLv3 (see http://www.gnu.org/licenses/gpl-3.0.html)
+         (two helper functions copied from web, as cited below)
+Package Requirements: python-augeas, bjsonrpc
+
+This file implements both ends (privilaged daemon and unprivilaged python
+client library) of a crude system configuration message bus, intended for use
+(initially) with the Plinth web interface to the FreedomBox operating system.
+
+The goal is to provide partially-untrusted processes (such as the web interface
+running as the www-data user) access to core system configuration files
+(through the Augeas library) and daemon control (through the init.d scripts).
+
+The daemon process (started in the same startup script as Plinth) runs as root
+and accepts JSON-RPC method calls through a unix domain socket
+(/tmp/exmachina.sock by default). Because file access control may not be
+sufficiently flexible for access control, a somewhat-elaborate secret key
+mechanism can be used to control access to the RPC mechanism.
+
+The (optional) shared secret-key mechanism requires clients to first call the
+"authenticate" RPC method before any other methods. The secret key is passed to
+the server process through stdin at startup (command line arguments could be
+snooped by unprivilaged processes), and would presumably be passed on to the
+client in the same way. The init_test.sh script demonstrates this mechanism.
+"""
 
 import os
 import sys
@@ -33,7 +57,7 @@ def execute_service(servicename, action, timeout=10):
         return "ERROR: so such service"
 
     command_list = [script, action]
-    log.info("running: %s" % command_list)
+    log.info("executing: %s" % command_list)
     proc = subprocess.Popen(command_list,
                             bufsize=0,
                             stdout=subprocess.PIPE,
@@ -46,13 +70,18 @@ def execute_service(servicename, action, timeout=10):
     if proc.poll() == None:
         if float(sys.version[:3]) >= 2.6:
             proc.terminate()
-        raise Exception("Timeout: %s" % command_list)
+        raise Exception("execution timed out (>%d seconds): %s" % 
+                        (timeout, command_list))
 
     stdout, stderr = proc.communicate()
     return stdout, stderr, proc.returncode
 
 class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
 
+    # authentication state variable. If not None, still need to authenticate;
+    # if None then authentication not require or was already successful for
+    # this instantiation of the Handler.  This class variable gets optionally
+    # overridden on a per-process basis
     secret_key = None
 
     def _setup(self):
@@ -60,17 +89,10 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
 
     def authenticate(self, secret_key):
         if not secret_key.strip() == self.secret_key.strip():
+            # fail hard
             log.error("Authentication failed!")
             sys.exit()
         self.secret_key = None
-
-    def test_whattime(self):
-        log.debug("whattime")
-        return time.time()
-
-    def test_listfiles(self):
-        log.debug("listfiles")
-        return self.augeas.match("/files/etc/*")
 
     # ------------- Augeas API Passthrough -----------------
     def augeas_save(self):
@@ -120,7 +142,7 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
             log.info("augeas: remove %s" % path)
             return self.augeas.remove(path.encode('utf-8'))
 
-    # ------------- Service Control -----------------
+    # ------------- init.d Service Control -----------------
     def initd_status(self, servicename):
         if not self.secret_key:
             return execute_service(servicename, "status")
@@ -138,9 +160,23 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
             return execute_service(servicename, "restart")
    
 class EmptyClass():
+    # Used by ExMachinaClient below
     pass
 
 class ExMachinaClient():
+    """Simple client wrapper library to expose augeas and init.d methods.
+
+    In brief, use augeas.get/set/insert to modify system configuration files
+    under the /files/etc/* namespace. augeas.match with a wildcard can be used
+    to find variables to edit.
+
+    After making any changes, use augeas.save to commit to disk, then
+    initd.restart to restart the appropriate system daemons. In many cases,
+    this would be the 'networking' meta-daemon.
+
+    See test_exmachina.py for some simple examples; see the augeas docs for
+    more in depth guidance.
+    """
 
     def __init__(self,
                  socket_path="/tmp/exmachina.sock",
@@ -171,8 +207,7 @@ class ExMachinaClient():
     def close(self):
         self.sock.close()
 
-def run_server(socket_path="/tmp/exmachina.sock", secret_key=None):
-    # TODO: check for root permissions, warn if not root
+def run_server(socket_path, secret_key=None):
 
     if not 0 == os.geteuid():
         log.warn("Expected to be running as root!")
@@ -183,31 +218,18 @@ def run_server(socket_path="/tmp/exmachina.sock", secret_key=None):
     sock.bind(socket_path)
     sock.listen(1)
 
+    # TODO: www-data group permissions only?
     os.chmod(socket_path, 0666)
     if secret_key:
         ExMachinaHandler.secret_key = secret_key
-        """
-        (conn, addr) = sock.accept()
-        print addr
-        msg = conn.recv(1024).strip()
-        if not msg == secret_key:
-            print "|%s| != |%s|" % (msg, secret_key)
-            log.error("Didn't receive secret key at socket initialization!")
-            conn.close()
-            sys.exit()
-        # now that connection is established, lock the pipe
-        os.chmod(socket_path, 0600)
-        log.info("Auth!")
-        """
-    serv = bjsonrpc.server.Server(sock, handler_factory=ExMachinaHandler)
 
-    # TODO: www-data group permissions only?
-    #os.chmod(socket_path, 0666)
+    serv = bjsonrpc.server.Server(sock, handler_factory=ExMachinaHandler)
     serv.serve()
 
 def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
     """
     From: http://www.noah.org/wiki/Daemonize_Python
+
     This forks the current process into a daemon. The stdin, stdout, and
     stderr arguments are file names that will be opened and be used to replace
     the standard file descriptors in sys.stdin, sys.stdout, and sys.stderr.
@@ -274,6 +296,10 @@ def main():
         default=False,
         help="Just dump a random base64 key and exit",
         action="store_true")
+    parser.add_option("-s", "--socket-path", 
+        default="/tmp/exmachina.sock",
+        help="UNIX Domain socket file path to listen on",
+        metavar="FILE")
     parser.add_option("--pid-file", 
         default=None,
         help="Daemonize and write pid to this file",
@@ -309,7 +335,7 @@ def main():
 
     if options.pid_file:
         with open(options.pid_file, 'w') as pfile:
-            # ensure file is available
+            # ensure file is available/writable
             pass
         os.unlink(options.pid_file)
         daemonize()
@@ -318,7 +344,7 @@ def main():
             pfile.write("%s" % pid)
         log.info("Daemonized, pid is %s" % pid)
 
-    run_server(secret_key=secret_key)
+    run_server(secret_key=secret_key, socket_path=options.socket_path)
 
 if __name__ == '__main__':
     main()
