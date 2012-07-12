@@ -12,6 +12,7 @@ import socket
 import subprocess
 import stat
 import time
+import base64
 
 import bjsonrpc
 import bjsonrpc.handlers
@@ -21,7 +22,7 @@ import augeas
 
 log = logging.getLogger(__name__)
 
-def run_service(servicename, action, timeout=10):
+def execute_service(servicename, action, timeout=10):
     """This function mostly ripped from StackOverflow:
     http://stackoverflow.com/questions/1556348/python-run-a-process-with-timeout-and-capture-stdout-stderr-and-exit-status
     """
@@ -51,9 +52,17 @@ def run_service(servicename, action, timeout=10):
     return stdout, stderr, proc.returncode
 
 class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
-    
+
+    secret_key = None
+
     def _setup(self):
         self.augeas = augeas.Augeas()
+
+    def authenticate(self, secret_key):
+        if not secret_key.strip() == self.secret_key.strip():
+            log.error("Authentication failed!")
+            sys.exit()
+        self.secret_key = None
 
     def test_whattime(self):
         log.debug("whattime")
@@ -65,66 +74,83 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
 
     # ------------- Augeas API Passthrough -----------------
     def augeas_save(self):
-        log.info("augeas: saving config")
-        return self.augeas.save()
+        if not self.secret_key:
+            log.info("augeas: saving config")
+            return self.augeas.save()
 
     def augeas_set(self, path, value):
-        log.info("augeas: set %s=%s" % (path, value))
-        return self.augeas.set(path.encode('utf-8'),
-                               value.encode('utf-8'))
-
-    def augeas_setm(self, base, sub, value):
-        log.info("augeas: setm %s %s = %s" % (base, sub, value))
-        return self.augeas.setm(base.encode('utf-8'),
-                                sub.encode('utf-8'),
+        if not self.secret_key:
+            log.info("augeas: set %s=%s" % (path, value))
+            return self.augeas.set(path.encode('utf-8'),
                                 value.encode('utf-8'))
 
+    def augeas_setm(self, base, sub, value):
+        if not self.secret_key:
+            log.info("augeas: setm %s %s = %s" % (base, sub, value))
+            return self.augeas.setm(base.encode('utf-8'),
+                                    sub.encode('utf-8'),
+                                    value.encode('utf-8'))
+
     def augeas_get(self, path):
-        # reduce verbosity
-        log.debug("augeas: get %s" % path)
-        return self.augeas.get(path.encode('utf-8'))
+        if not self.secret_key:
+            # reduce verbosity
+            log.debug("augeas: get %s" % path)
+            return self.augeas.get(path.encode('utf-8'))
 
     def augeas_match(self, path):
-        # reduce verbosity
-        log.debug("augeas: match %s" % path)
-        return self.augeas.match("%s" % path.encode('utf-8'))
+        if not self.secret_key:
+            # reduce verbosity
+            log.debug("augeas: match %s" % path)
+            return self.augeas.match("%s" % path.encode('utf-8'))
 
     def augeas_insert(self, path, label, before=True):
-        log.info("augeas: insert %s=%s" % (path, value))
-        return self.augeas.insert(path.encode('utf-8'),
-                                  label.encode('utf-8'),
-                                  before=before)
+        if not self.secret_key:
+            log.info("augeas: insert %s=%s" % (path, value))
+            return self.augeas.insert(path.encode('utf-8'),
+                                    label.encode('utf-8'),
+                                    before=before)
 
     def augeas_move(self, src, dst):
-        log.info("augeas: move %s -> %s" % (src, dst))
-        return self.augeas.move(src.encode('utf-8'), dst.encode('utf-8'))
+        if not self.secret_key:
+            log.info("augeas: move %s -> %s" % (src, dst))
+            return self.augeas.move(src.encode('utf-8'), dst.encode('utf-8'))
 
     def augeas_remove(self, path):
-        log.info("augeas: remove %s" % path)
-        return self.augeas.remove(path.encode('utf-8'))
+        if not self.secret_key:
+            log.info("augeas: remove %s" % path)
+            return self.augeas.remove(path.encode('utf-8'))
 
     # ------------- Service Control -----------------
     def initd_status(self, servicename):
-        return run_service(servicename, "status")
+        if not self.secret_key:
+            return execute_service(servicename, "status")
 
     def initd_start(self, servicename):
-        return run_service(servicename, "start")
+        if not self.secret_key:
+            return execute_service(servicename, "start")
 
     def initd_stop(self, servicename):
-        return run_service(servicename, "stop")
+        if not self.secret_key:
+            return execute_service(servicename, "stop")
 
     def initd_restart(self, servicename):
-        return run_service(servicename, "restart")
+        if not self.secret_key:
+            return execute_service(servicename, "restart")
    
 class EmptyClass():
     pass
 
 class ExMachinaClient():
 
-    def __init__(self, socket_path = "/tmp/exmachina.sock"):
+    def __init__(self,
+                 socket_path="/tmp/exmachina.sock",
+                 secret_key=None):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(socket_path)
         self.conn = bjsonrpc.connection.Connection(self.sock)
+
+        if secret_key:
+            self.conn.call.authenticate(secret_key)
 
         self.augeas = EmptyClass()
         self.initd = EmptyClass()
@@ -141,11 +167,11 @@ class ExMachinaClient():
         self.initd.start = self.conn.call.initd_start
         self.initd.stop = self.conn.call.initd_stop
         self.initd.restart = self.conn.call.initd_restart
-    
+
     def close(self):
         self.sock.close()
 
-def run_server(socket_path="/tmp/exmachina.sock"):
+def run_server(socket_path="/tmp/exmachina.sock", secret_key=None):
     # TODO: check for root permissions, warn if not root
 
     if not 0 == os.geteuid():
@@ -157,12 +183,71 @@ def run_server(socket_path="/tmp/exmachina.sock"):
     sock.bind(socket_path)
     sock.listen(1)
 
+    os.chmod(socket_path, 0666)
+    if secret_key:
+        ExMachinaHandler.secret_key = secret_key
+        """
+        (conn, addr) = sock.accept()
+        print addr
+        msg = conn.recv(1024).strip()
+        if not msg == secret_key:
+            print "|%s| != |%s|" % (msg, secret_key)
+            log.error("Didn't receive secret key at socket initialization!")
+            conn.close()
+            sys.exit()
+        # now that connection is established, lock the pipe
+        os.chmod(socket_path, 0600)
+        log.info("Auth!")
+        """
     serv = bjsonrpc.server.Server(sock, handler_factory=ExMachinaHandler)
 
-    # TODO: group permissions only?
-    os.chmod(socket_path, 0777)
-
+    # TODO: www-data group permissions only?
+    #os.chmod(socket_path, 0666)
     serv.serve()
+
+def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    """
+    From: http://www.noah.org/wiki/Daemonize_Python
+    This forks the current process into a daemon. The stdin, stdout, and
+    stderr arguments are file names that will be opened and be used to replace
+    the standard file descriptors in sys.stdin, sys.stdout, and sys.stderr.
+    These arguments are optional and default to /dev/null. Note that stderr is
+    opened unbuffered, so if it shares a file with stdout then interleaved
+    output may not appear in the order that you expect. """
+
+    # Do first fork.
+    try: 
+        pid = os.fork() 
+        if pid > 0:
+            sys.exit(0)   # Exit first parent.
+    except OSError, e: 
+        sys.stderr.write ("fork #1 failed: (%d) %s\n" % (e.errno, e.strerror) )
+        sys.exit(1)
+
+    # Decouple from parent environment.
+    os.chdir("/") 
+    os.umask(0) 
+    os.setsid() 
+
+    # Do second fork.
+    try: 
+        pid = os.fork() 
+        if pid > 0:
+            sys.exit(0)   # Exit second parent.
+    except OSError, e: 
+        sys.stderr.write ("fork #2 failed: (%d) %s\n" % (e.errno, e.strerror) )
+        sys.exit(1)
+
+    # Now I am a daemon!
+    
+    # Redirect standard file descriptors.
+    si = open(stdin, 'r')
+    so = open(stdout, 'a+')
+    se = open(stderr, 'a+', 0)
+    os.dup2(si.fileno(), sys.stdin.fileno())
+    os.dup2(so.fileno(), sys.stdout.fileno())
+    os.dup2(se.fileno(), sys.stderr.fileno())
+    return pid
 
 # =============================================================================
 # Command line handling
@@ -181,11 +266,27 @@ def main():
         default=False,
         help="Show fewer informational statements", 
         action="store_true")
+    parser.add_option("-k", "--key", 
+        default=False,
+        help="Wait for Secret Access Key on stdin before starting",
+        action="store_true")
+    parser.add_option("--random-key", 
+        default=False,
+        help="Just dump a random base64 key and exit",
+        action="store_true")
+    parser.add_option("--pid-file", 
+        default=None,
+        help="Daemonize and write pid to this file",
+        metavar="FILE")
 
     (options, args) = parser.parse_args()
 
     if len(args) != 0:
         parser.error("Incorrect number of arguments")
+
+    if options.random_key:
+        sys.stdout.write(base64.urlsafe_b64encode(os.urandom(128)))
+        sys.exit(0)
 
     log = logging.getLogger()
     hdlr = logging.StreamHandler()
@@ -200,7 +301,24 @@ def main():
     else:
         log.setLevel(logging.INFO)
 
-    run_server()
+    secret_key = None
+    if options.key:
+        log.debug("Waiting for secret key on stdin...")
+        secret_key = sys.stdin.readline().strip()
+        log.debug("Got it!")
+
+    if options.pid_file:
+        with open(options.pid_file, 'w') as pfile:
+            # ensure file is available
+            pass
+        os.unlink(options.pid_file)
+        daemonize()
+        pid = os.getpid()
+        with open(options.pid_file, 'w') as pfile:
+            pfile.write("%s" % pid)
+        log.info("Daemonized, pid is %s" % pid)
+
+    run_server(secret_key=secret_key)
 
 if __name__ == '__main__':
     main()
