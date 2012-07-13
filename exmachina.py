@@ -88,6 +88,9 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
         self.augeas = augeas.Augeas()
 
     def authenticate(self, secret_key):
+        if not self.secret_key:
+            log.warn("Unecessary authentication attempt")
+            return
         if not secret_key.strip() == self.secret_key.strip():
             # fail hard
             log.error("Authentication failed!")
@@ -300,7 +303,7 @@ def main():
         default="/tmp/exmachina.sock",
         help="UNIX Domain socket file path to listen on",
         metavar="FILE")
-    parser.add_option("--pid-file", 
+    parser.add_option("--pidfile", 
         default=None,
         help="Daemonize and write pid to this file",
         metavar="FILE")
@@ -333,14 +336,14 @@ def main():
         secret_key = sys.stdin.readline().strip()
         log.debug("Got it!")
 
-    if options.pid_file:
-        with open(options.pid_file, 'w') as pfile:
+    if options.pidfile:
+        with open(options.pidfile, 'w') as pfile:
             # ensure file is available/writable
             pass
-        os.unlink(options.pid_file)
+        os.unlink(options.pidfile)
         daemonize()
         pid = os.getpid()
-        with open(options.pid_file, 'w') as pfile:
+        with open(options.pidfile, 'w') as pfile:
             pfile.write("%s" % pid)
         log.info("Daemonized, pid is %s" % pid)
 
