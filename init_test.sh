@@ -4,7 +4,7 @@
 
 export key=`./exmachina.py --random-key`
 
-echo $key | ./exmachina.py -vk --pid-file /tmp/exmachina_test.pid
+echo $key | ./exmachina.py -vk --pidfile /tmp/exmachina_test.pid
 sleep 1
 echo $key | sudo -u www-data -g www-data ./test_exmachina.py -k
 

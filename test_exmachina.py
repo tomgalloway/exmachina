@@ -1,10 +1,22 @@
 #!/usr/bin/env python
 
 """
-To use with secret keys, do:
+This file tests the "client side" of the exmachina layer.
 
+To use with secret keys, do the following in seperate terminals:
+
+    $ echo "<key>" | ./exmachina.py -vk
     $ echo "<key>" | ./test.py -k
 
+To use without, do the following in seperate terminals:
+
+    $ echo "<key>" | ./exmachina.py -vk
+    $ echo "<key>" | ./test.py -k
+
+Use the init_test.sh script to test shared key passing and privilage seperation
+at the same time:
+
+    $ sudo ./init_test.sh
 """
 
 import sys
