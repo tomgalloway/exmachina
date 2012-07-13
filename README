@@ -8,11 +8,19 @@
 
 ### Status
 
-Basic server and client functionality implemented. Very crude.
+Basic server and client functionality implemented. Crude, and far more simple
+than it may appear or the length of code would imply.
+
+Features:
+* shared secret key process/privilage seperation
+* call augeas API: match, set, setm, get, save, move, insert, remove
+* call init.d service scripts: status, start, stop, restart
 
 TODO:
+* add --group argument, chgrp, and 0660 permissions on socket file
+* add apt-get package installation/removal methods
+* add/handle one or two common non-augeas configuration methods (eg, timezone?)
 * use /var/lib/exmachina/<something> as socket instead of /tmp/exmachina.sock?
-* tests and demonstrations
 
 ### Dependancies (server)
 
