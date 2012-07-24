@@ -30,7 +30,7 @@ client in the same way. The init_test.sh script demonstrates this mechanism.
 
 import os
 import sys
-import optparse
+import argparse
 import logging
 import socket
 import subprocess
@@ -279,41 +279,41 @@ def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
 def main():
 
     global log
-    parser = optparse.OptionParser(usage=
+    parser = argparse.ArgumentParser(usage=
         "usage: %prog [options]\n"
         "%prog --help for more info."
     )
-    parser.add_option("-v", "--verbose", 
+    parser.add_argument("-v", "--verbose", 
         default=False,
         help="Show more debugging statements", 
         action="store_true")
-    parser.add_option("-q", "--quiet", 
+    parser.add_argument("-q", "--quiet", 
         default=False,
         help="Show fewer informational statements", 
         action="store_true")
-    parser.add_option("-k", "--key", 
+    parser.add_argument("-k", "--key", 
         default=False,
         help="Wait for Secret Access Key on stdin before starting",
         action="store_true")
-    parser.add_option("--random-key", 
+    parser.add_argument("--random-key", 
         default=False,
         help="Just dump a random base64 key and exit",
         action="store_true")
-    parser.add_option("-s", "--socket-path", 
+    parser.add_argument("-s", "--socket-path", 
         default="/tmp/exmachina.sock",
         help="UNIX Domain socket file path to listen on",
         metavar="FILE")
-    parser.add_option("--pidfile", 
+    parser.add_argument("--pidfile", 
         default=None,
         help="Daemonize and write pid to this file",
         metavar="FILE")
 
-    (options, args) = parser.parse_args()
+    args = parser.parse_args()
 
-    if len(args) != 0:
-        parser.error("Incorrect number of arguments")
+    #if len(args) != 0:
+        #parser.error("Incorrect number of arguments")
 
-    if options.random_key:
+    if args.random_key:
         sys.stdout.write(base64.urlsafe_b64encode(os.urandom(128)))
         sys.exit(0)
 
@@ -323,31 +323,31 @@ def main():
     hdlr.setFormatter(formatter)
     log.addHandler(hdlr)
 
-    if options.verbose:
+    if args.verbose:
         log.setLevel(logging.DEBUG)
-    elif options.quiet:
+    elif args.quiet:
         log.setLevel(logging.ERROR)
     else:
         log.setLevel(logging.INFO)
 
     secret_key = None
-    if options.key:
+    if args.key:
         log.debug("Waiting for secret key on stdin...")
         secret_key = sys.stdin.readline().strip()
         log.debug("Got it!")
 
-    if options.pidfile:
-        with open(options.pidfile, 'w') as pfile:
+    if args.pidfile:
+        with open(args.pidfile, 'w') as pfile:
             # ensure file is available/writable
             pass
-        os.unlink(options.pidfile)
+        os.unlink(args.pidfile)
         daemonize()
         pid = os.getpid()
-        with open(options.pidfile, 'w') as pfile:
+        with open(args.pidfile, 'w') as pfile:
             pfile.write("%s" % pid)
         log.info("Daemonized, pid is %s" % pid)
 
-    run_server(secret_key=secret_key, socket_path=options.socket_path)
+    run_server(secret_key=secret_key, socket_path=args.socket_path)
 
 if __name__ == '__main__':
     main()
