@@ -43,8 +43,8 @@ import bjsonrpc.handlers
 import bjsonrpc.server
 import augeas
 
-
 log = logging.getLogger(__name__)
+
 
 def execute_service(servicename, action, timeout=10):
     """This function mostly ripped from StackOverflow:
@@ -64,17 +64,18 @@ def execute_service(servicename, action, timeout=10):
                             stderr=subprocess.PIPE)
     poll_seconds = .250
     deadline = time.time() + timeout
-    while time.time() < deadline and proc.poll() == None:
+    while time.time() < deadline and proc.poll() is None:
         time.sleep(poll_seconds)
 
-    if proc.poll() == None:
+    if proc.poll() is None:
         if float(sys.version[:3]) >= 2.6:
             proc.terminate()
-        raise Exception("execution timed out (>%d seconds): %s" % 
+        raise Exception("execution timed out (>%d seconds): %s" %
                         (timeout, command_list))
 
     stdout, stderr = proc.communicate()
     return stdout, stderr, proc.returncode
+
 
 class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
 
@@ -161,10 +162,12 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
     def initd_restart(self, servicename):
         if not self.secret_key:
             return execute_service(servicename, "restart")
-   
+
+
 class EmptyClass():
     # Used by ExMachinaClient below
     pass
+
 
 class ExMachinaClient():
     """Simple client wrapper library to expose augeas and init.d methods.
@@ -210,6 +213,7 @@ class ExMachinaClient():
     def close(self):
         self.sock.close()
 
+
 def run_server(socket_path, secret_key=None):
 
     if not 0 == os.geteuid():
@@ -229,7 +233,7 @@ def run_server(socket_path, secret_key=None):
     serv = bjsonrpc.server.Server(sock, handler_factory=ExMachinaHandler)
     serv.serve()
 
-def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+def daemonize(stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
     """
     From: http://www.noah.org/wiki/Daemonize_Python
 
@@ -241,30 +245,30 @@ def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
     output may not appear in the order that you expect. """
 
     # Do first fork.
-    try: 
-        pid = os.fork() 
+    try:
+        pid = os.fork()
         if pid > 0:
             sys.exit(0)   # Exit first parent.
-    except OSError, e: 
-        sys.stderr.write ("fork #1 failed: (%d) %s\n" % (e.errno, e.strerror) )
+    except OSError, e:
+        sys.stderr.write("fork #1 failed: (%d) %s\n" % (e.errno, e.strerror))
         sys.exit(1)
 
     # Decouple from parent environment.
-    os.chdir("/") 
-    os.umask(0) 
-    os.setsid() 
+    os.chdir("/")
+    os.umask(0)
+    os.setsid()
 
     # Do second fork.
-    try: 
-        pid = os.fork() 
+    try:
+        pid = os.fork()
         if pid > 0:
             sys.exit(0)   # Exit second parent.
-    except OSError, e: 
-        sys.stderr.write ("fork #2 failed: (%d) %s\n" % (e.errno, e.strerror) )
+    except OSError, e:
+        sys.stderr.write("fork #2 failed: (%d) %s\n" % (e.errno, e.strerror))
         sys.exit(1)
 
     # Now I am a daemon!
-    
+
     # Redirect standard file descriptors.
     si = open(stdin, 'r')
     so = open(stdout, 'a+')
@@ -283,27 +287,27 @@ def main():
         "usage: %prog [options]\n"
         "%prog --help for more info."
     )
-    parser.add_argument("-v", "--verbose", 
+    parser.add_argument("-v", "--verbose",
         default=False,
-        help="Show more debugging statements", 
+        help="Show more debugging statements",
         action="store_true")
-    parser.add_argument("-q", "--quiet", 
+    parser.add_argument("-q", "--quiet",
         default=False,
-        help="Show fewer informational statements", 
+        help="Show fewer informational statements",
         action="store_true")
-    parser.add_argument("-k", "--key", 
+    parser.add_argument("-k", "--key",
         default=False,
         help="Wait for Secret Access Key on stdin before starting",
         action="store_true")
-    parser.add_argument("--random-key", 
+    parser.add_argument("--random-key",
         default=False,
         help="Just dump a random base64 key and exit",
         action="store_true")
-    parser.add_argument("-s", "--socket-path", 
+    parser.add_argument("-s", "--socket-path",
         default="/tmp/exmachina.sock",
         help="UNIX Domain socket file path to listen on",
         metavar="FILE")
-    parser.add_argument("--pidfile", 
+    parser.add_argument("--pidfile",
         default=None,
         help="Daemonize and write pid to this file",
         metavar="FILE")

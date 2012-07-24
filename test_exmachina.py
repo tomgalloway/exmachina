@@ -34,7 +34,7 @@ from exmachina import ExMachinaClient
 # Command line handling
 def main():
 
-    socket_path="/tmp/exmachina.sock"
+    socket_path = "/tmp/exmachina.sock"
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(socket_path)
 
