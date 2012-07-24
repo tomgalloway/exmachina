@@ -30,6 +30,7 @@ client in the same way. The init_test.sh script demonstrates this mechanism.
 
 import os
 import sys
+import grp
 import argparse
 import logging
 import socket
@@ -214,7 +215,7 @@ class ExMachinaClient():
         self.sock.close()
 
 
-def run_server(socket_path, secret_key=None):
+def run_server(socket_path, secret_key=None, socket_group=None):
 
     if not 0 == os.geteuid():
         log.warn("Expected to be running as root!")
@@ -225,8 +226,13 @@ def run_server(socket_path, secret_key=None):
     sock.bind(socket_path)
     sock.listen(1)
 
-    # TODO: www-data group permissions only?
-    os.chmod(socket_path, 0666)
+    if socket_group is not None:
+        socket_uid = os.stat(socket_path).st_uid
+        socket_gid = grp.getgrnam(socket_group).gr_gid
+        os.chmod(socket_path, 0660)
+        os.chown(socket_path, socket_uid, socket_gid)
+    else:
+        os.chmod(socket_path, 0666)
     if secret_key:
         ExMachinaHandler.secret_key = secret_key
 
@@ -311,6 +317,9 @@ def main():
         default=None,
         help="Daemonize and write pid to this file",
         metavar="FILE")
+    parser.add_argument("-g", "--group",
+        default=None,
+        help="chgrp socket file to this group and set 0660 permissions")
 
     args = parser.parse_args()
 
@@ -351,7 +360,9 @@ def main():
             pfile.write("%s" % pid)
         log.info("Daemonized, pid is %s" % pid)
 
-    run_server(secret_key=secret_key, socket_path=args.socket_path)
+    run_server(secret_key=secret_key,
+               socket_path=args.socket_path,
+               socket_group=args.group)
 
 if __name__ == '__main__':
     main()

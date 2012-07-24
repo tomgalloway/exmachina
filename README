@@ -17,7 +17,6 @@ Features:
 * call init.d service scripts: status, start, stop, restart
 
 TODO:
-* add --group argument, chgrp, and 0660 permissions on socket file
 * add apt-get package installation/removal methods
 * add/handle one or two common non-augeas configuration methods (eg, timezone?)
 * use /var/lib/exmachina/<something> as socket instead of /tmp/exmachina.sock?
