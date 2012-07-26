@@ -77,6 +77,37 @@ def execute_service(servicename, action, timeout=10):
     stdout, stderr = proc.communicate()
     return stdout, stderr, proc.returncode
 
+def execute_apt(packagename, action, timeout=120, aptargs=['-q', '-y']):
+    # ensure package name isn't tricky trick
+    if action != "update" \
+            and (packagename != packagename.strip().split()[0] \
+                 or packagename.startswith('-')):
+        raise ValueError("Not a good apt package name: %s" % packagename)
+
+    if action == "update":
+        command_list = ['apt-get', action]
+    else:
+        command_list = ['apt-get', action, packagename]
+    command_list.extend(aptargs)
+    log.info("executing: %s" % command_list)
+    proc = subprocess.Popen(command_list,
+                            bufsize=0,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    poll_seconds = .250
+    deadline = time.time() + timeout
+    while time.time() < deadline and proc.poll() is None:
+        time.sleep(poll_seconds)
+
+    if proc.poll() is None:
+        if float(sys.version[:3]) >= 2.6:
+            proc.terminate()
+        raise Exception("execution timed out (>%d seconds): %s" %
+                        (timeout, command_list))
+
+    stdout, stderr = proc.communicate()
+    return stdout, stderr, proc.returncode
+
 
 class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
 
@@ -147,6 +178,13 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
             log.info("augeas: remove %s" % path)
             return self.augeas.remove(path.encode('utf-8'))
 
+    # ------------- Misc. non-Augeas Helpers -----------------
+    def set_timezone(self, tzname):
+        if not self.secret_key:
+            log.info("reset timezone to %s" % tzname)
+            pass
+
+
     # ------------- init.d Service Control -----------------
     def initd_status(self, servicename):
         if not self.secret_key:
@@ -163,6 +201,19 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
     def initd_restart(self, servicename):
         if not self.secret_key:
             return execute_service(servicename, "restart")
+
+    # ------------- apt-get Package Control -----------------
+    def apt_install(self, packagename):
+        if not self.secret_key:
+            return execute_apt(packagename, "install")
+
+    def apt_update(self):
+        if not self.secret_key:
+            return execute_apt("", "update")
+
+    def apt_remove(self, packagename):
+        if not self.secret_key:
+            return execute_apt(packagename, "remove")
 
 
 class EmptyClass():
@@ -197,6 +248,7 @@ class ExMachinaClient():
 
         self.augeas = EmptyClass()
         self.initd = EmptyClass()
+        self.apt = EmptyClass()
 
         self.augeas.save = self.conn.call.augeas_save
         self.augeas.set = self.conn.call.augeas_set
@@ -210,6 +262,9 @@ class ExMachinaClient():
         self.initd.start = self.conn.call.initd_start
         self.initd.stop = self.conn.call.initd_stop
         self.initd.restart = self.conn.call.initd_restart
+        self.apt.install = self.conn.call.apt_install
+        self.apt.update = self.conn.call.apt_update
+        self.apt.remove = self.conn.call.apt_remove
 
     def close(self):
         self.sock.close()

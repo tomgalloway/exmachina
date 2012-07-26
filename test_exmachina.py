@@ -65,6 +65,9 @@ def main():
     print client.initd.status("greentooth")
     print "(expect Error on the above line)"
     print client.initd.status("bluetooth")
+    print client.apt.install("pkg_which_does_not_exist")
+    print client.apt.remove("pkg_which_does_not_exist")
+    #print client.apt.update() # can be slow...
     client.close()
 
 if __name__ == '__main__':
