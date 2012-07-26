@@ -31,11 +31,11 @@ client in the same way. The init_test.sh script demonstrates this mechanism.
 import os
 import sys
 import grp
+import shutil
 import argparse
 import logging
 import socket
 import subprocess
-import stat
 import time
 import base64
 
@@ -55,7 +55,7 @@ def execute_service(servicename, action, timeout=10):
     script = "/etc/init.d/" + os.path.split(servicename)[1]
 
     if not os.path.exists(script):
-        return "ERROR: so such service"
+        raise ValueError("so such service: %s" % servicename)
 
     command_list = [script, action]
     log.info("executing: %s" % command_list)
@@ -75,6 +75,7 @@ def execute_service(servicename, action, timeout=10):
                         (timeout, command_list))
 
     stdout, stderr = proc.communicate()
+    # TODO: should raise exception here if proc.returncode != 0?
     return stdout, stderr, proc.returncode
 
 def execute_apt(packagename, action, timeout=120, aptargs=['-q', '-y']):
@@ -182,8 +183,19 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
     def set_timezone(self, tzname):
         if not self.secret_key:
             log.info("reset timezone to %s" % tzname)
-            pass
-
+            tzname = tzname.strip()
+            tzpath = os.path.join("/usr/share/zoneinfo", tzname)
+            try:
+                os.stat(tzpath)
+            except OSError:
+                # file not found
+                raise ValueError("timezone not valid: %s" % tzname)
+            shutil.copy(
+                os.path.join("/usr/share/zoneinfo", tzname),
+                "/etc/localtime")
+            with open("/etc/timezone", "w") as tzfile:
+                tzfile.write(tzname + "\n")
+            return "timezone changed to %s" % tzname
 
     # ------------- init.d Service Control -----------------
     def initd_status(self, servicename):
@@ -249,6 +261,7 @@ class ExMachinaClient():
         self.augeas = EmptyClass()
         self.initd = EmptyClass()
         self.apt = EmptyClass()
+        self.misc = EmptyClass()
 
         self.augeas.save = self.conn.call.augeas_save
         self.augeas.set = self.conn.call.augeas_set
@@ -265,6 +278,7 @@ class ExMachinaClient():
         self.apt.install = self.conn.call.apt_install
         self.apt.update = self.conn.call.apt_update
         self.apt.remove = self.conn.call.apt_remove
+        self.misc.set_timezone = self.conn.call.set_timezone
 
     def close(self):
         self.sock.close()
