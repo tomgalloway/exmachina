@@ -3,7 +3,7 @@
 """
 Author: bnewbold <bnewbold@robocracy.org>
 Date: July 2012
-License: GPLv3 (see http://www.gnu.org/licenses/gpl-3.0.html)
+License: GPLv3 or later (see http://www.gnu.org/licenses/gpl-3.0.html)
          (two helper functions copied from web, as cited below)
 Package Requirements: python-augeas, bjsonrpc
 
