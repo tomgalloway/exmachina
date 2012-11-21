@@ -75,7 +75,7 @@ def execute_service(servicename, action, timeout=10):
                         (timeout, command_list))
 
     stdout, stderr = proc.communicate()
-    # TODO: should raise exception here if proc.returncode != 0?
+    # TBD: should raise exception here if proc.returncode != 0?
     return stdout, stderr, proc.returncode
 
 def execute_apt(packagename, action, timeout=120, aptargs=['-q', '-y']):

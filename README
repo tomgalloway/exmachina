@@ -6,6 +6,14 @@
                                                      
                                  by the hand of root
 
+
+
+
+                      ! ! ! ! ! ! ! ! ! ! ! ! ! !           
+                     ! ! ! READ ./DISCLAIMER ! ! !
+                      ! ! ! ! ! ! ! ! ! ! ! ! ! !           
+
+
 ### Status
 
 Basic server and client functionality implemented. Crude, and far more simple
@@ -16,7 +24,7 @@ Features:
 * call augeas API: match, set, setm, get, save, move, insert, remove
 * call init.d service scripts: status, start, stop, restart
 
-TODO:
+TBD:
 * use /var/lib/exmachina/<something> as socket instead of /tmp/exmachina.sock?
 
 ### Dependancies (server)
