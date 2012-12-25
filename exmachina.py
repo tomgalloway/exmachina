@@ -26,6 +26,10 @@ The (optional) shared secret-key mechanism requires clients to first call the
 the server process through stdin at startup (command line arguments could be
 snooped by unprivilaged processes), and would presumably be passed on to the
 client in the same way. The init_test.sh script demonstrates this mechanism.
+
+Note that the authentication mechanism only tells the server that the client
+seems to be legitimate, it doesn't prevent a rapid "man in the middle" style
+attack on the client, which could feed back malicious information.
 """
 
 import os
@@ -41,6 +45,7 @@ import base64
 import functools
 import hashlib
 import atexit
+import stat
 
 import bjsonrpc
 import bjsonrpc.handlers
@@ -124,7 +129,7 @@ def authreq(fn):
             return fn(self, *args, **kwargs)
         else:
             log.error("Unauthorized function call attempt; bailing")
-            exit(-1)
+            sys.exit(-1)
     return wrappedfunc
 
 class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
@@ -139,14 +144,14 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
         global allow_connect
         if not allow_connect:
             log.error("second client tried to connect, exiting")
-            exit(-1)
+            sys.exit(-1)
         allow_connect = False
         self.augeas = augeas.Augeas()
 
     def _shutdown(self):
         # Server shuts down after a single client connection closes
         log.info("connection closing, server exiting")
-        exit(-1)
+        sys.exit(-1)
 
     def authenticate(self, secret_key):
         if not self.secret_key:
@@ -339,8 +344,25 @@ def run_server(socket_path, secret_key=None, socket_group=None):
     if not 0 == os.geteuid():
         log.warn("Expected to be running as root!")
 
-    # if the socket was left open after a previous run, overwrite it
+    # check if the socket was left open after a previous run, overwrite it
     if os.path.exists(socket_path):
+        if not stat.S_ISSOCK(os.stat(socket_path).st_mode):
+            log.error("socket_path exists and isn't a stale socket: %s" %
+                      socket_path)
+            sys.exit(-1)
+        # socket file exists, need to check if it's stale from a previous
+        # session
+        test_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            test_sock.connect(socket_path)
+            log.error("socket_path already exists and seems to be active: %s" %
+                      socket_path)
+            test_sock.close()
+            sys.exit(-1)
+        except Exception, e:
+            print e
+        # if we got this far it's probably a stale socket and should be
+        # destroyed
         log.warn("Clobbering pre-existing socket: %s" % socket_path)
         os.unlink(socket_path)
 

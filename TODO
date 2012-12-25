@@ -1,3 +1,2 @@
-- socket overwriting problem; use directory trick?
 - strengthen default permissions on socket
 - document per-app socket naming intention
