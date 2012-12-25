@@ -39,6 +39,7 @@ import subprocess
 import time
 import base64
 import functools
+import hashlib
 
 import bjsonrpc
 import bjsonrpc.handlers
@@ -150,8 +151,9 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
         if not self.secret_key:
             log.warn("Unecessary authentication attempt")
             return
-        if not secret_key.strip() == self.secret_key.strip():
-            # fail hard
+        if not hashlib.sha256(secret_key.strip()).hexdigest() == \
+                hashlib.sha256(self.secret_key.strip()).hexdigest():
+            # key doesn't match, fail hard
             log.error("Authentication failed!")
             sys.exit()
         self.secret_key = None
@@ -282,6 +284,11 @@ class ExMachinaClient():
     def __init__(self,
                  socket_path="/tmp/exmachina.sock",
                  secret_key=None):
+
+        if secret_key:
+            secret_key = hashlib.sha256(secret_key.strip() + "|exmachina")\
+                                .hexdigest()
+
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(socket_path)
         self.conn = bjsonrpc.connection.Connection(self.sock)
@@ -323,6 +330,10 @@ class ExMachinaClient():
 
 
 def run_server(socket_path, secret_key=None, socket_group=None):
+
+    if secret_key:
+        secret_key = hashlib.sha256(secret_key.strip() + "|exmachina")\
+                            .hexdigest()
 
     if not 0 == os.geteuid():
         log.warn("Expected to be running as root!")
