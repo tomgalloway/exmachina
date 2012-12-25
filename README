@@ -27,6 +27,10 @@ probably escalate privileges one way or another (install arbitrary packages,
 reconfigure networks, enable callback scripts, edit system configuration
 files).
 
+The server and client processes should be one-to-one: only one client should
+ever connect to the server. The init_test.sh script shows how this could be
+achieved in a SysV-style /etc/init.d script.
+
 The intended use case is writing a user-friendly web control panel for a Debian
 server or router: the web designer creating the user interface should not be
 overly concerned with writing secure code, and the web application itself
@@ -71,6 +75,10 @@ Features:
 * shared secret key process/privilege separation
 * call augeas API: match, set, setm, get, save, move, insert, remove
 * call init.d service scripts: status, start, stop, restart
+
+In late 2012 Nick Daly (of the FreedomBox project) wrote up a brief audit of
+this code and concept on his blog (https://www.betweennowhere.net/). Link is
+frequantly broken.
 
 ### Dependencies (server)
 
