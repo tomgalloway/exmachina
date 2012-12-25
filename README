@@ -39,6 +39,8 @@ etc) should not run with strong system permissions, but core components of the
 system (such as hostname, wireless access point configuration, network
 settings, package installation, locale, timezone, etc) need to be modified.
 
+See the comments in exmachina.py for more information.
+
 ### Alternatives
 
 The most simple alternative to exmachina that has been recommended to me is to

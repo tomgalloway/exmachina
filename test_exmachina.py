@@ -40,7 +40,7 @@ def main():
     if sys.argv[-1] == "-k":
         print "waiting for key on stdin..."
         secret_key = sys.stdin.readline()
-        print "sent!"
+        print "got it!"
 
     print "========= Testing JSON-RPC connection"
     c = bjsonrpc.connection.Connection(sock)
