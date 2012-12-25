@@ -40,6 +40,7 @@ import time
 import base64
 import functools
 import hashlib
+import atexit
 
 import bjsonrpc
 import bjsonrpc.handlers
@@ -346,6 +347,13 @@ def run_server(socket_path, secret_key=None, socket_group=None):
     # open and bind to unix socket
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.bind(socket_path)
+
+    # we just created the socket file, so now let's register an atexit callback
+    # to clean up after ourselves if we get Ctrl-C'd (or exit for any other
+    # reason, including normal cleanup)
+    def delete_socket():
+        os.unlink(socket_path)
+    atexit.register(delete_socket)
 
     # only going to  allow a single client, so don't allow queued connections
     sock.listen(0)
