@@ -1,7 +1,4 @@
 - socket overwriting problem; use directory trick?
 - strengthen default permissions on socket
-- comment socket code
-- client: if authentication fails, then bail
-- server: only allow one auth ever. close and quit after client closes.
 - document per-app socket naming intention
 - hash secret key, salted with 'exmachina'

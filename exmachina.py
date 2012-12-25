@@ -47,6 +47,8 @@ import augeas
 
 log = logging.getLogger(__name__)
 
+# hackish way to enforce single client connection
+allow_connect = True
 
 def execute_service(servicename, action, timeout=10):
     """This function mostly ripped from StackOverflow:
@@ -132,7 +134,17 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
     secret_key = None
 
     def _setup(self):
+        global allow_connect
+        if not allow_connect:
+            log.error("second client tried to connect, exiting")
+            exit(-1)
+        allow_connect = False
         self.augeas = augeas.Augeas()
+
+    def _shutdown(self):
+        # Server shuts down after a single client connection closes
+        log.info("connection closing, server exiting")
+        exit(-1)
 
     def authenticate(self, secret_key):
         if not self.secret_key:
@@ -144,6 +156,11 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
             sys.exit()
         self.secret_key = None
 
+    def need_to_auth(self):
+        """
+        Helper for clients to learn whether they still need to authenticate
+        """
+        return self.secret_key != None
 
     # ------------- Augeas API Passthrough -----------------
     @authreq
@@ -269,8 +286,15 @@ class ExMachinaClient():
         self.sock.connect(socket_path)
         self.conn = bjsonrpc.connection.Connection(self.sock)
 
-        if secret_key:
-            self.conn.call.authenticate(secret_key)
+        if self.conn.call.need_to_auth():
+            if secret_key:
+                self.conn.call.authenticate(secret_key)
+            else:
+                self.conn.close()
+                raise Exception(
+                    "authentication required but no secret_key passed")
+        elif secret_key:
+            print "secret_key passed but no authentication required; ignoring"
 
         self.augeas = EmptyClass()
         self.initd = EmptyClass()
@@ -307,9 +331,13 @@ def run_server(socket_path, secret_key=None, socket_group=None):
     if os.path.exists(socket_path):
         log.warn("Clobbering pre-existing socket: %s" % socket_path)
         os.unlink(socket_path)
+
+    # open and bind to unix socket
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.bind(socket_path)
-    sock.listen(1)
+
+    # only going to  allow a single client, so don't allow queued connections
+    sock.listen(0)
 
     if socket_group is not None:
         socket_uid = os.stat(socket_path).st_uid
@@ -322,6 +350,11 @@ def run_server(socket_path, secret_key=None, socket_group=None):
     if secret_key:
         ExMachinaHandler.secret_key = secret_key
 
+    # get bjsonrpc server started. it would make more sense to just listen for
+    # a single client connection and pass that off to the bjsonrpc handler,
+    # then close the socket when that's done, but I don't see an easy way to do
+    # that with the bjsonrpc API, so instead we let it wait indefinately for
+    # connections, but actual only allow one and bail when that one closes.
     serv = bjsonrpc.server.Server(sock, handler_factory=ExMachinaHandler)
     serv.serve()
 

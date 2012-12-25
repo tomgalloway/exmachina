@@ -32,15 +32,17 @@ from exmachina import ExMachinaClient
 # Command line handling
 def main():
 
-    socket_path = "/tmp/exmachina.sock"
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.connect(socket_path)
-
     secret_key = None
     if sys.argv[-1] == "-k":
         print "waiting for key on stdin..."
         secret_key = sys.stdin.readline()
         print "got it!"
+
+    """
+    # both tests together won't work now that server exits after single client
+    socket_path = "/tmp/exmachina.sock"
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(socket_path)
 
     print "========= Testing JSON-RPC connection"
     c = bjsonrpc.connection.Connection(sock)
@@ -55,6 +57,7 @@ def main():
     print "hostname: %s" % c.call.augeas_get("/files/etc/hostname/*")
     print "localhost: %s" % c.call.augeas_get("/files/etc/hosts/1/canonical")
     sock.close()
+    """
 
     print "========= Testing user client library"
     client = ExMachinaClient(secret_key=secret_key)
