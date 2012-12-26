@@ -30,6 +30,9 @@ client in the same way. The init_test.sh script demonstrates this mechanism.
 Note that the authentication mechanism only tells the server that the client
 seems to be legitimate, it doesn't prevent a rapid "man in the middle" style
 attack on the client, which could feed back malicious information.
+
+Alternatively, an optional user or group can be specified and the socket file
+will have it's ownership and permissions changed appropriately.
 """
 
 import os
@@ -345,6 +348,9 @@ def run_server(socket_path, secret_key=None, socket_group=None,
 
     if not 0 == os.geteuid():
         log.warn("Expected to be running as root!")
+        if socket_group or socket_user:
+            log.error("Can't change socket permissions if non-root, exiting")
+            sys.exit(-1)
 
     # check if the socket was left open after a previous run, overwrite it
     if os.path.exists(socket_path):
