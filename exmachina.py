@@ -33,6 +33,9 @@ attack on the client, which could feed back malicious information.
 
 Alternatively, an optional user or group can be specified and the socket file
 will have it's ownership and permissions changed appropriately.
+
+Note that the socket path would need to be changed on a per-application basis
+so that competing daemons don't block/clobber each other. 
 """
 
 import os
