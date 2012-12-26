@@ -46,6 +46,7 @@ import functools
 import hashlib
 import atexit
 import stat
+import pwd
 
 import bjsonrpc
 import bjsonrpc.handlers
@@ -335,7 +336,8 @@ class ExMachinaClient():
         self.sock.close()
 
 
-def run_server(socket_path, secret_key=None, socket_group=None):
+def run_server(socket_path, secret_key=None, socket_group=None,
+               socket_user=None):
 
     if secret_key:
         secret_key = hashlib.sha256(secret_key.strip() + "|exmachina")\
@@ -377,18 +379,29 @@ def run_server(socket_path, secret_key=None, socket_group=None):
         os.unlink(socket_path)
     atexit.register(delete_socket)
 
-    # only going to  allow a single client, so don't allow queued connections
-    sock.listen(0)
-
     if socket_group is not None:
+        # optionally set group-only permissions on socket file before we start
+        # accepting connections
         socket_uid = os.stat(socket_path).st_uid
         socket_gid = grp.getgrnam(socket_group).gr_gid
+        os.chmod(socket_path, 0660)
+        os.chown(socket_path, socket_uid, socket_gid)
+    elif socket_user is not None:
+        # optionally set user-only permissions on socket file before we start
+        # accepting connections
+        pwn = pwd.getpwnam(socket_user)
+        socket_uid = pwn.pw_uid
+        socket_gid = pwn.pw_gid
         os.chmod(socket_path, 0660)
         os.chown(socket_path, socket_uid, socket_gid)
     else:
         os.chmod(socket_path, 0666)
 
+    # only going to  allow a single client, so don't allow queued connections
+    sock.listen(0)
+
     if secret_key:
+        # key already got hashed above
         ExMachinaHandler.secret_key = secret_key
 
     # get bjsonrpc server started. it would make more sense to just listen for
@@ -450,8 +463,8 @@ def main():
 
     global log
     parser = argparse.ArgumentParser(usage=
-        "usage: %prog [options]\n"
-        "%prog --help for more info."
+        "usage: exmachina.py [options]\n"
+        "exmachina.py --help for more info."
     )
     parser.add_argument("-v", "--verbose",
         default=False,
@@ -480,8 +493,14 @@ def main():
     parser.add_argument("-g", "--group",
         default=None,
         help="chgrp socket file to this group and set 0660 permissions")
+    parser.add_argument("-u", "--user",
+        default=None,
+        help="chown socket file to this user/group and set 0600 permissions")
 
     args = parser.parse_args()
+
+    if args.user and args.group:
+        parser.error("set user or group option, but not both")
 
     #if len(args) != 0:
         #parser.error("Incorrect number of arguments")
@@ -522,7 +541,8 @@ def main():
 
     run_server(secret_key=secret_key,
                socket_path=args.socket_path,
-               socket_group=args.group)
+               socket_group=args.group,
+               socket_user=args.user)
 
 if __name__ == '__main__':
     main()
