@@ -64,6 +64,28 @@ log = logging.getLogger(__name__)
 # hackish way to enforce single client connection
 allow_connect = True
 
+def execute_ubuntu_service(servicename, action, timeout=10):
+    command_list = ["service", servicename, action]
+    log.info("executing: %s" % command_list)
+    proc = subprocess.Popen(command_list,
+                            bufsize=0,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    poll_seconds = .250
+    deadline = time.time() + timeout
+    while time.time() < deadline and proc.poll() is None:
+        time.sleep(poll_seconds)
+
+    if proc.poll() is None:
+        if float(sys.version[:3]) >= 2.6:
+            proc.terminate()
+        raise Exception("execution timed out (>%d seconds): %s" %
+                        (timeout, command_list))
+
+    stdout, stderr = proc.communicate()
+    # TBD: should raise exception here if proc.returncode != 0?
+    return stdout, stderr, proc.returncode
+
 def execute_service(servicename, action, timeout=10):
     """This function mostly ripped from StackOverflow:
     http://stackoverflow.com/questions/1556348/python-run-a-process-with-timeout-and-capture-stdout-stderr-and-exit-status
@@ -260,6 +282,11 @@ class ExMachinaHandler(bjsonrpc.handlers.BaseHandler):
     def initd_restart(self, servicename):
         return execute_service(servicename, "restart")
 
+    # ------------- Ubuntu Service Control -----------------
+    @authreq
+    def service_start(self, servicename):
+        return execute_ubuntu_service(servicename, "start")
+
     # ------------- apt-get Package Control -----------------
     @authreq
     def apt_install(self, packagename):
@@ -320,6 +347,7 @@ class ExMachinaClient():
         self.initd = EmptyClass()
         self.apt = EmptyClass()
         self.misc = EmptyClass()
+        self.service = EmptyClass()
 
         self.augeas.save = self.conn.call.augeas_save
         self.augeas.set = self.conn.call.augeas_set
@@ -333,6 +361,7 @@ class ExMachinaClient():
         self.initd.start = self.conn.call.initd_start
         self.initd.stop = self.conn.call.initd_stop
         self.initd.restart = self.conn.call.initd_restart
+        self.service.start = self.conn.call.service_start
         self.apt.install = self.conn.call.apt_install
         self.apt.update = self.conn.call.apt_update
         self.apt.remove = self.conn.call.apt_remove
